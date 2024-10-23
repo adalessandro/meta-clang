@@ -12,26 +12,27 @@ DEPENDS += "bison-native \
             libcereal \
             libbpf \
             "
+DEPENDS += "${@bb.utils.contains('PTEST_ENABLED', '1', 'pahole-native llvm-native', '', d)}"
 
-PV .= "+git${SRCREV}"
 RDEPENDS:${PN} += "bash python3 xz"
 
+PV .= "+git"
+
 SRC_URI = "git://github.com/iovisor/bpftrace;branch=master;protocol=https \
-           file://0001-Detect-new-BTF-api-btf_dump__new-btf_dump__new_v0_6_.patch \
-           file://0001-Fix-segfault-when-btf__type_by_id-returns-NULL.patch \
+           file://0001-replace-python-with-python3-in-the-test.patch \
+           file://0002-ast-Repace-getInt8PtrTy-with-getPtrTy.patch \
+           file://0003-ast-Adjust-to-enum-changes-in-llvm-18.patch \
+           file://0004-cmake-Bump-max-LLVM-version-to-18.patch \
+           file://0001-use-64bit-alignment-for-map-counter-atomic-add.patch \
            file://run-ptest \
 "
-SRCREV = "0a318e53343aa51f811183534916a4be65a1871e"
+SRCREV = "fe6362b4e2c1b9d0833c7d3f308c1d4006b54723"
 
 S = "${WORKDIR}/git"
 
 inherit cmake ptest
 
 PACKAGECONFIG ?= "${@bb.utils.contains('PTEST_ENABLED', '1', 'tests', '', d)}"
-
-# Clang-15.x crashes compiling some usdt tests
-# see https://github.com/llvm/llvm-project/issues/58477
-PACKAGECONFIG:remove:riscv64 = "tests"
 
 PACKAGECONFIG[tests] = "-DBUILD_TESTING=ON,-DBUILD_TESTING=OFF,gtest xxd-native"
 
@@ -52,9 +53,13 @@ LLVM_MAJOR_VERSION = "${@llvm_major_version(d)}"
 EXTRA_OECMAKE = " \
     -DCMAKE_ENABLE_EXPORTS=1 \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_REQUESTED_VERSION=${LLVM_MAJOR_VERSION} \
+    -DUSE_SYSTEM_BPF_BCC=ON \
     -DENABLE_MAN=OFF \
 "
 
 COMPATIBLE_HOST = "(x86_64.*|aarch64.*|powerpc64.*|riscv64.*)-linux"
 COMPATIBLE_HOST:libc-musl = "null"
+
+INHIBIT_PACKAGE_STRIP_FILES += "\
+    ${PKGD}${PTEST_PATH}/tests/testprogs/uprobe_test \
+"
